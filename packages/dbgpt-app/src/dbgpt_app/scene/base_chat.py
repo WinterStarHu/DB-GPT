@@ -19,6 +19,11 @@ from dbgpt.core import (
 )
 from dbgpt.core.interface.file import FileStorageClient
 from dbgpt.core.interface.media import MediaContent
+# [intranet-patch] 本地多模态:图片 OCR→文字(bind-mount vision_ocr.py,缺失/失败降级)
+try:
+    from vision_ocr import replace_images_with_text
+except Exception:  # 模块不存在时降级
+    replace_images_with_text = None
 from dbgpt.core.interface.message import (
     HumanMessage,
     ModelMessage,
@@ -389,6 +394,12 @@ class BaseChat(ABC):
                     msg.content = MediaContent.replace_url(
                         msg.content, self._file_serve.replace_uri
                     )
+                    # [intranet-patch] 图片→文字(minicpm-v OCR),失败降级不阻塞
+                    if replace_images_with_text is not None:
+                        try:
+                            msg.content = replace_images_with_text(msg.content)
+                        except Exception:
+                            pass
         return model_request
 
     def stream_plugin_call(self, text):
